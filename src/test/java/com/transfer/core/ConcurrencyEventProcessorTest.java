@@ -2,6 +2,7 @@ package com.transfer.core;
 
 import com.google.gson.Gson;
 import com.transfer.core.event.AccountCreateEvent;
+import com.transfer.core.event.AccountEvent;
 import com.transfer.core.event.AccountInfoEvent;
 import com.transfer.core.event.AccountTransferEvent;
 import org.testng.annotations.AfterClass;
@@ -17,18 +18,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ConcurrencyEventProcessorTest {
 
-    private final AccountEventPublisherImpl accountEventPublisher = new AccountEventPublisherImpl();
+    private final BlockingQueue<AccountEvent> eventBus = new ArrayBlockingQueue<>(1024);
+    private final AccountStorage<AccountInfo, UUID> accountStorage = new AccountStorageImpl();
+    private final AccountEventPublisherImpl accountEventPublisher = new AccountEventPublisherImpl(eventBus);
+    private final AccountEventProcessor accountEventProcessor = new AccountEventProcessorImpl(accountStorage, eventBus);
     private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     private final Gson gson = new Gson();
 
     @BeforeClass
     public void init() {
-        accountEventPublisher.start();
+        accountEventProcessor.start();
     }
 
     @AfterClass
-    public void close() {
-        accountEventPublisher.close();
+    public void close() throws Exception{
+        accountEventProcessor.close();
     }
 
     @Test

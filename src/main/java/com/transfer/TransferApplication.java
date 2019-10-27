@@ -1,32 +1,41 @@
 package com.transfer;
 
-import com.transfer.core.AccountEventPublisherImpl;
+import com.transfer.core.*;
+import com.transfer.core.event.AccountEvent;
 import com.transfer.transport.HttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class TransferApplication implements AutoCloseable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TransferApplication.class);
 
-    private final AccountEventPublisherImpl accountEventProcessorImpl;
     private final HttpServer httpServer;
+    private final AccountEventProcessor accountEventProcessor;
 
     TransferApplication() {
-        this.accountEventProcessorImpl = new AccountEventPublisherImpl();
-        this.httpServer = new HttpServer(accountEventProcessorImpl);
+        BlockingQueue<AccountEvent> eventBus = new ArrayBlockingQueue<>(1024);
+        AccountStorage<AccountInfo, UUID> accountStorage = new AccountStorageImpl();
+        AccountEventPublisher accountEventPublisher = new AccountEventPublisherImpl(eventBus);
+
+        this.accountEventProcessor = new AccountEventProcessorImpl(accountStorage, eventBus);
+        this.httpServer = new HttpServer(accountEventPublisher);
     }
 
     public void start() {
         LOGGER.info("About to start exchange application");
-        accountEventProcessorImpl.start();
+        accountEventProcessor.start();
         httpServer.start();
     }
 
     @Override
-    public void close() {
+    public void close() throws Exception{
         LOGGER.info("About to stop exchange application");
         httpServer.close();
-        accountEventProcessorImpl.close();
+        accountEventProcessor.close();
     }
 }

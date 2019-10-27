@@ -1,30 +1,41 @@
 package com.transfer.transport
 
+import com.transfer.core.AccountEventProcessorImpl
 import com.transfer.core.AccountEventPublisherImpl
+import com.transfer.core.AccountStorageImpl
 import groovyx.net.http.HttpResponseException
 import groovyx.net.http.RESTClient
 import spock.lang.Shared
 import spock.lang.Specification
+
+import java.util.concurrent.ArrayBlockingQueue
 
 import static groovyx.net.http.ContentType.JSON
 
 class HttpServerSpec extends Specification {
 
     @Shared
-            accountEventPublisher = new AccountEventPublisherImpl()
+            eventBus = new ArrayBlockingQueue<>(1024)
+    @Shared
+            accountStorage = new AccountStorageImpl();
+    @Shared
+            accountEventPublisher = new AccountEventPublisherImpl(eventBus)
+    @Shared
+            accountEventProcessor = new AccountEventProcessorImpl(accountStorage, eventBus);
     @Shared
             httpServer = new HttpServer(accountEventPublisher)
     @Shared
             client = new RESTClient('http://localhost:80/')
 
+
     def setupSpec() {
-        accountEventPublisher.start()
+        accountEventProcessor.start()
         httpServer.start()
     }
 
     def cleanupSpec() {
         httpServer.close()
-        accountEventPublisher.close()
+        accountEventProcessor.close()
     }
 
     def "should create account"() {
